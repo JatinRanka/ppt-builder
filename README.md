@@ -4,8 +4,6 @@ Describe a deck in natural language, watch the AI build it slide by slide, then
 refine it through conversation **or** edit any slide by hand — without either
 destroying the other.
 
-Built for the Sarvam technical assignment.
-
 ---
 
 # 1. Setup
@@ -117,7 +115,7 @@ Three things worth knowing about this flow:
   actually references — resolved from the message itself ("slide 4", "the last
   slide"), the current selection, or a content search.
 
-## The four Technical Expectations
+## Core design decisions
 
 **Structured output** — the AI returns JSON conforming to the Zod schema in
 `schema/deck.ts`. Blocks are a flat, ID'd array rather than a nested tree, which
@@ -141,8 +139,7 @@ that should not have changed:
 expect(res.deck.slides[0]).toBe(deck.slides[0]); // same object, not a copy
 ```
 
-**Two-phase generation** — the assignment names this but only defines three
-expectations in its body, so: **phase 1** produces the deck's _shape_ (count,
+**Two-phase generation** — **phase 1** produces the deck's _shape_ (count,
 titles, kinds, order) and **phase 2** fills each slide's content individually.
 It is visible in the schema (`slide.status`, `slide.brief`) and _structurally
 enforced_ — `add_slide` has no `blocks` parameter, so the model physically
@@ -186,7 +183,7 @@ The API routes are unauthenticated, so the posted deck is treated as untrusted.
 ### Incomplete
 
 - **Streaming is per-slide, not per-token.** Slides appear one at a time as
-  phase 2 completes each, which satisfies "slides appear one by one". Token-level
+  phase 2 completes each, so slides do appear one by one. Token-level
   typewriter streaming _within_ a slide is **not wired into the UI**, though the
   plumbing exists (`streamChat` in the adapter, and Sarvam does support streamed
   tool calls). This is the main thing I'd build next.
@@ -204,8 +201,8 @@ The API routes are unauthenticated, so the posted deck is treated as untrusted.
   in the chat.
 - **Undo granularity for text is per-commit** (on blur), not per-keystroke.
   Native character-level undo still works inside a focused field.
-- **No auth, no backend persistence** — both explicitly out of scope per the
-  assignment. Size caps and per-IP rate limiting are in place; see Security.
+- **No auth, no backend persistence** — both explicitly out of scope for this
+  project. Size caps and per-IP rate limiting are in place; see Security.
 
 ### Trade-offs worth naming
 

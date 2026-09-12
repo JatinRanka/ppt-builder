@@ -2,10 +2,10 @@
 /**
  * TOOL CALL DETAIL — shows exactly what the agent did.
  *
- * The point of this component is auditability. The assignment is graded on
- * agentic tool use and diff-based edits, and both claims are only credible if
- * you can SEE them: which tool ran, what arguments the model produced, which
- * slide was targeted, and what ops resulted. A one-line summary hides all of
+ * The point of this component is auditability. This app leans hard on agentic
+ * tool use and diff-based edits, and both claims are only credible if you can
+ * SEE them: which tool ran, what arguments the model produced, which slide was
+ * targeted, and what ops resulted. A one-line summary hides all of
  * that, and during testing it actively misled us — the model reported
  * "shortened the table to three rows" while the underlying patch no-opped.
  *

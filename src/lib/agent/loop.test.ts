@@ -5,7 +5,7 @@
  * whole tool loop and two-phase orchestration are testable with zero network
  * and no API key, because the agent depends on an interface rather than an SDK.
  *
- * These tests assert the properties the assignment actually grades:
+ * These tests assert the properties that actually matter:
  *   - the model's tool calls become real deck mutations
  *   - an edit produces a TARGETED patch, not a regenerated deck
  *   - validation errors are fed back so the model can self-correct
