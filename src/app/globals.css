@@ -1,26 +1,171 @@
 @import "tailwindcss";
 
+/*
+ * ---------- APP DESIGN TOKENS ----------
+ * The app chrome and the SLIDE SURFACE are two deliberately separate palettes.
+ * These `--app-*` tokens style the chrome only; slide surfaces are driven by
+ * the `--slide-*` vars that themes.ts applies, because those also have to
+ * survive into PPTX/PDF export where no CSS exists.
+ *
+ * Keeping them apart is what lets a dark-themed slide sit on a light workspace
+ * without either one having to compromise.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+
+  --app-bg: #eeeef0;          /* recessed: must stay clearly darker than
+                                 the lightest slide bg (#fdfdfc), or a paper
+                                 slide dissolves into the canvas */
+  --app-surface: #ffffff;     /* raised: panels, toolbar, rail, cards */
+  --app-subtle: #fafafa;      /* inputs and inset wells */
+  --app-border: #e4e4e6;      /* THE hairline — one weight everywhere */
+  --app-border-strong: #cfcfd2; /* hover / emphasis only */
+  --app-fg: #1a1a1c;
+  --app-muted: #6b6b70;
+  --app-faint: #9a9aa0;
+  --app-accent: #4f46e5;
+  --app-accent-hover: #4338ca;
+  --app-accent-soft: #eef2ff;
+  --app-danger: #dc2626;
+  --app-danger-soft: #fef2f2;
+  --app-warn: #b45309;
+  --app-warn-soft: #fffbeb;
+
+  --r-control: 10px;
+  --r-panel: 14px;
+  --r-slide: 16px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html, body {
+  height: 100%;
+  background: var(--app-bg);
+  color: var(--app-fg);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/*
+ * The app shell manages its own scrolling (fixed viewport, internal panes) and
+ * locks body scroll via this class, applied from the shell's own effect.
+ *
+ * This is opt-IN rather than a blanket `overflow: hidden` on html/body: the
+ * global version silently broke /print, which needs normal document scrolling
+ * to review slides before printing. Keying off a class rather than a
+ * `:has()` selector avoids depending on the framework's DOM nesting.
+ */
+html.app-locked,
+html.app-locked body {
+  overflow: hidden;
+}
+
+/* Softer, thinner scrollbars so internal panes don't get a heavy grey gutter. */
+@supports (scrollbar-width: thin) {
+  .pane-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--app-border-strong) transparent;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* contentEditable placeholder — :empty only matches with no child nodes, which
+   is why EditableText renders nothing rather than a space when empty. */
+[contenteditable][data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Hover affordance so editable regions are discoverable without being noisy.
+   Uses the SLIDE accent (not the app accent) because it sits on the slide. */
+.editable:hover:not(:focus) {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--slide-accent) 40%, transparent);
+}
+
+/* ---------- MOTION ----------
+   Every animation here is event-driven: it plays because something actually
+   happened (a slide arrived, content is generating). Nothing loops for
+   decoration. */
+
+/* Slides fade and rise as phase 2 fills them in. */
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-in {
+  animation: slide-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Chat messages land with the same motion vocabulary, just shorter. */
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-msg-in {
+  animation: msg-in 200ms ease-out both;
+}
+
+/* A sweep, rather than an opacity pulse, so a generating slide reads as
+   "work in progress" instead of "broken element". */
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+.shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--slide-bg-alt) 0%,
+    color-mix(in srgb, var(--slide-bg-alt) 45%, var(--slide-muted)) 50%,
+    var(--slide-bg-alt) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-in,
+  .animate-msg-in,
+  .shimmer {
+    animation: none;
+  }
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- PRINT / PDF EXPORT ----------
+   One slide per landscape page at exact 1280x720. The print view reuses the
+   same SlideFrame renderers as the editor, so the PDF cannot drift from what
+   the user saw on screen. */
+@media print {
+  html, body {
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  /* Undo the on-screen fit-to-window scaling so pages print at true size. */
+  .preview-page {
+    width: 1280px !important;
+    height: 720px !important;
+  }
+  .preview-page > div {
+    transform: none !important;
+  }
+  .no-print { display: none !important; }
+  .print-page {
+    break-after: page;
+    page-break-after: always;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  .print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  /* Slides must print their true colours, not the browser's ink-saving guess. */
+  .print-page, .print-page * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+@page {
+  size: 1280px 720px landscape;
+  margin: 0;
 }
