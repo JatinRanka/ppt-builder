@@ -26,6 +26,29 @@ import type { NextRequest } from 'next/server';
  */
 const isDev = process.env.NODE_ENV === 'development';
 
+/**
+ * PostHog ingest endpoints, needed in `connect-src` so the browser is allowed
+ * to send analytics events. Read from the same public env var the client SDK
+ * initialises with (src/instrumentation-client.ts) so the two cannot drift;
+ * unset means no analytics, and nothing is added to the policy.
+ *
+ * The asset host is separate from the ingest host: PostHog lazily loads
+ * recorder/surveys bundles from a *-assets.i.posthog.com origin. Script
+ * loading itself is governed by 'strict-dynamic' (the nonced SDK is trusted to
+ * load them), but those bundles then fetch, so the origin is listed here too.
+ */
+const posthogOrigins = (() => {
+  const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;
+  if (!host) return [];
+  try {
+    const { origin } = new URL(host);
+    return [origin, origin.replace('.i.posthog.com', '-assets.i.posthog.com')];
+  } catch {
+    // A malformed host would otherwise take down every request with a 500.
+    return [];
+  }
+})();
+
 export function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
 
@@ -45,8 +68,9 @@ export function proxy(request: NextRequest) {
     // fetching them, and that is allowlisted separately in src/lib/safeUrl.ts.
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
-    // The app talks only to its own API routes; the LLM call is server-side.
-    `connect-src 'self'${isDev ? ' ws: wss:' : ''}`,
+    // The app talks only to its own API routes (the LLM call is server-side),
+    // plus PostHog's ingest host for analytics.
+    `connect-src 'self'${isDev ? ' ws: wss:' : ''}${posthogOrigins.map((o) => ` ${o}`).join('')}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
