@@ -174,7 +174,13 @@ The API routes are unauthenticated, so the posted deck is treated as untrusted.
 - **Prompt injection.** Deck content is fenced as data (`agent/prompts.ts`), but
   the real bound is capability: seven diff-only tools, no `replace_deck`. An
   injection can garble slides (undoable), not exfiltrate or execute.
-- **Headers.** CSP, `frame-ancestors 'none'`, and `no-store` on `/api/*`.
+- **Headers.** CSP, `frame-ancestors 'none'`, and `no-store` on `/api/*`. The
+  CSP is built per-request in `src/proxy.ts` so it can carry a nonce:
+  `script-src` stays free of `'unsafe-inline'`, which means Next's inline
+  hydration scripts need the nonce to run, which in turn means `/` and
+  `/print` must render per-request (`await connection()`). `style-src` keeps
+  `'unsafe-inline'` because a nonce cannot authorise inline `style=`
+  attributes, and the slide canvas positions every block with them.
 - **Not covered.** No auth — anyone who can reach the deployment can spend your
   tokens within the rate limit.
 

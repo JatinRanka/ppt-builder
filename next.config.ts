@@ -8,35 +8,14 @@ import type { NextConfig } from "next";
  * (React escapes, and the codebase has no dangerouslySetInnerHTML), but these
  * headers make a future mistake non-fatal rather than immediately exploitable.
  *
- * CSP notes:
- *  - 'unsafe-inline' for styles is required by Tailwind v4 and React's inline
- *    style attributes (the slide canvas positions everything with them).
- *  - 'unsafe-inline'/'unsafe-eval' for scripts in DEV only — Next's dev
- *    overlay and HMR need them. Production gets the strict form.
- *  - img-src allows https: broadly because decks legitimately reference
- *    third-party image URLs, which the BROWSER fetches (sandboxed, user's own
- *    IP). The dangerous case is the SERVER fetching them, and that is
- *    allowlisted separately in src/lib/safeUrl.ts.
- *  - frame-ancestors 'none' plus X-Frame-Options blocks clickjacking of the
- *    editor, which has destructive one-click controls (delete slide, new deck).
+ * The Content-Security-Policy is NOT here. It needs a per-request nonce to
+ * allow Next's inline hydration scripts without opening the policy to all
+ * inline script, so it is built in src/proxy.ts. Do not add a CSP header to
+ * this file: the browser enforces the intersection of every CSP it receives,
+ * so a second static copy would re-block the scripts the nonce exists to allow.
+ *
+ * Everything below is request-independent, so it stays static config.
  */
-const isDev = process.env.NODE_ENV === "development";
-
-const csp = [
-  "default-src 'self'",
-  `script-src 'self'${isDev ? " 'unsafe-inline' 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:",
-  "font-src 'self' data:",
-  // The app talks only to its own API routes; the LLM call is server-side.
-  `connect-src 'self'${isDev ? " ws: wss:" : ""}`,
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  "upgrade-insecure-requests",
-].join("; ");
-
 const nextConfig: NextConfig = {
   // Do not advertise the framework version to scanners.
   poweredByHeader: false,
@@ -46,7 +25,7 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: [
-          { key: "Content-Security-Policy", value: csp },
+          // Legacy companion to the CSP's frame-ancestors 'none'.
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
